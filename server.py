@@ -1,5 +1,12 @@
 from time import sleep
 import SocketServer
+import json
+
+bikes = {
+         1: (32.656, -115.4086),
+         2: (32.655, -115.4100),
+         3: (32.6555, -115.4090),
+        }
 class MyTCPHandler(SocketServer.StreamRequestHandler):
 
     def handle(self):
@@ -16,10 +23,17 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
                 print self.data
                 # Likewise, self.wfile is a file-like object used to write back
                 # to the client
-                msg = "Hola\n"
-                for i in xrange(10):
+                for i in xrange(50):
+                    lr = 1 if i / 10 % 2 else -1;
+                    msg = json.dumps(bikes) + "\n"
                     print "Wrote to {}: {}".format(self.client_address[0], msg)
                     self.wfile.write(msg)
+                    #simulation code, remove when doing the real thing
+                    for k, (lat, lng) in bikes.iteritems():
+                        if k % 2 == 0:
+                            bikes[k] = (lat + lr * .00005, lng)
+                        else:
+                            bikes[k] = (lat , lng + lr *  .00005)
                     sleep(1)
                 self.wfile.write("EOT\n")
         except Exception as e:

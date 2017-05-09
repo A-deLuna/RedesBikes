@@ -4,12 +4,15 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.util.SparseArray;
+import android.util.SparseIntArray;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.io.BufferedReader;
@@ -19,7 +22,8 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.nio.BufferOverflowException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * An activity that displays a Google map with a marker (pin) to indicate a particular location.
@@ -29,6 +33,8 @@ public class MapsMarkerActivity extends AppCompatActivity
 
     private static final String IP = "192.168.1.66";
     private static final int PORT = 26968;
+    private Map<Integer, Marker> markerMap;
+    GoogleMap googleMap;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -39,7 +45,6 @@ public class MapsMarkerActivity extends AppCompatActivity
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-        new MessageTask().execute();
     }
 
     /**
@@ -53,17 +58,37 @@ public class MapsMarkerActivity extends AppCompatActivity
      */
     @Override
     public void onMapReady(GoogleMap googleMap) {
+        markerMap = new HashMap<Integer, Marker>();
         // Add a marker in Sydney, Australia,
         // and move the map's camera to the same location.
+        this.googleMap = googleMap;
         LatLng sydney = new LatLng(32.656, -115.4086);
-        googleMap.addMarker(new MarkerOptions().position(sydney)
-                .title("Marker in Sydney"));
+        //googleMap.addMarker(new MarkerOptions().position(sydney)
+        //        .title("Marker in Sydney"));
         googleMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
         googleMap.moveCamera(CameraUpdateFactory.zoomTo(17.5f));
         new MessageTask().execute();
 
     }
-    class MessageTask extends AsyncTask<Void, String, Void> {
+    public void setMarkers(Map<Integer, Pair<Float, Float>> map) {
+        Log.d("TONY", "setMarkers");
+        for (Map.Entry<Integer, Pair<Float, Float>> entry : map.entrySet()) {
+            Integer key = entry.getKey();
+            Pair<Float, Float> pair = entry.getValue();
+            LatLng l = new LatLng(pair.first, pair.second);
+
+            if(markerMap.containsKey(key)) {
+                Marker  m = markerMap.get(key);
+                m.setPosition(l);
+            }
+            else {
+                Marker m = googleMap.addMarker(new MarkerOptions().position(l)
+                        .title("Bike #" + entry.getKey()));
+                markerMap.put(key, m);
+            }
+        }
+    }
+    class MessageTask extends AsyncTask<Void, Map<Integer, Pair<Float,Float>>, Void> {
         @Override
         protected Void doInBackground(Void... nothing) {
             Socket socket = null;
@@ -90,6 +115,10 @@ public class MapsMarkerActivity extends AppCompatActivity
                         socket.close();
                         break;
                     }
+                    Log.d("TONY", "parsing");
+                    Map<Integer, Pair<Float, Float>> map = JsonParser.parse(serverMessage);
+                    Log.d("TONY", "publish progress");
+                    publishProgress(map);
                 }
 
             }
@@ -99,7 +128,10 @@ public class MapsMarkerActivity extends AppCompatActivity
 
             return null;
         }
-
+        @Override
+        protected void onProgressUpdate(Map<Integer, Pair<Float, Float>>... maps) {
+            setMarkers(maps[0]);
+        }
         @Override
         protected void onPostExecute(Void aVoid) {
             super.onPostExecute(aVoid);
